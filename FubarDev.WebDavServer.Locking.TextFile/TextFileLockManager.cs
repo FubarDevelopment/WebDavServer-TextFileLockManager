@@ -110,7 +110,7 @@ namespace FubarDev.WebDavServer.Locking.TextFile
                 _semaphore.Release();
             }
 
-            private IDictionary<string, ActiveLock> Load(string lockFileName)
+            private static IDictionary<string, ActiveLock> Load(string lockFileName)
             {
                 try
                 {
