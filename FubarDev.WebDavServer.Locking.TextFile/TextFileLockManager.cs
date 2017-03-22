@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+using AutoMapper;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -20,7 +22,7 @@ namespace FubarDev.WebDavServer.Locking.TextFile
 
         private readonly string _lockFileName;
 
-        public TextFileLockManager(ILockCleanupTask cleanupTask, ISystemClock systemClock, ILogger logger, IOptions<TextFileLockManagerOptions> options)
+        public TextFileLockManager(ILockCleanupTask cleanupTask, ISystemClock systemClock, ILogger<TextFileLockManager> logger, IOptions<TextFileLockManagerOptions> options)
             : base(cleanupTask, systemClock, logger, options.Value)
         {
             _logger = logger;
@@ -39,27 +41,29 @@ namespace FubarDev.WebDavServer.Locking.TextFile
         private void AddLocksToCleanupTask()
         {
             if (!File.Exists(_lockFileName))
+                return;
+
+            // Load all active locks and add them to the cleanup task.
+            // This ensures that locks still do expire.
+            try
             {
-                // Load all active locks and add them to the cleanup task.
-                // This ensures that locks still do expire.
-                try
+                var file = File.ReadAllText(_lockFileName);
+                var activeLocks = JsonConvert.DeserializeObject<ICollection<ActiveLock>>(file);
+                foreach (var activeLock in activeLocks)
                 {
-                    var file = File.ReadAllText(_lockFileName);
-                    var activeLocks = JsonConvert.DeserializeObject<ICollection<ActiveLock>>(file);
-                    foreach (var activeLock in activeLocks)
-                    {
-                        LockCleanupTask.Add(this, activeLock);
-                    }
+                    LockCleanupTask.Add(this, activeLock);
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(0, ex, "Failed to load the lock file: {0}", ex.Message);
-                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(0, ex, "Failed to load the lock file: {0}", ex.Message);
             }
         }
 
         private class TextFileTransaction : ILockManagerTransaction
         {
+            private static readonly IMapper _mapper = new MapperConfiguration(ConfigureMapper).CreateMapper();
+
             private readonly string _lockFileName;
 
             private readonly SemaphoreSlim _semaphore;
@@ -80,7 +84,9 @@ namespace FubarDev.WebDavServer.Locking.TextFile
 
             public Task<bool> AddAsync(IActiveLock activeLock, CancellationToken cancellationToken)
             {
-                throw new NotImplementedException();
+                var isNew = _locks.ContainsKey(activeLock.StateToken);
+                _locks[activeLock.StateToken] = ToActiveLock(activeLock);
+                return Task.FromResult(isNew);
             }
 
             public Task<bool> UpdateAsync(IActiveLock activeLock, CancellationToken cancellationToken)
@@ -127,6 +133,19 @@ namespace FubarDev.WebDavServer.Locking.TextFile
                 }
 
                 return new Dictionary<string, ActiveLock>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            private static ActiveLock ToActiveLock(IActiveLock activeLock)
+            {
+                if (activeLock is ActiveLock l)
+                    return l;
+                return _mapper.Map<ActiveLock>(activeLock);
+            }
+
+            private static void ConfigureMapper(IMapperConfigurationExpression cfg)
+            {
+                cfg.CreateMap<IActiveLock, ActiveLock>()
+                   .ForMember(x => x.Owner, opt => opt.MapFrom(x => x.GetOwner()));
             }
         }
     }
