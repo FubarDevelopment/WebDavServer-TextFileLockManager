@@ -100,7 +100,7 @@ namespace FubarDev.WebDavServer.Locking.TextFile
 
             public Task CommitAsync(CancellationToken cancellationToken)
             {
-                var json = JsonConvert.SerializeObject(_locks);
+                var json = JsonConvert.SerializeObject(_locks.Values);
                 File.WriteAllText(_lockFileName, json);
                 return Task.FromResult(0);
             }
