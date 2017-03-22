@@ -75,7 +75,7 @@ namespace FubarDev.WebDavServer.Locking.TextFile
 
             public Task<IReadOnlyCollection<IActiveLock>> GetActiveLocksAsync(CancellationToken cancellationToken)
             {
-                throw new NotImplementedException();
+                return Task.FromResult<IReadOnlyCollection<IActiveLock>>(_locks.Values.Cast<IActiveLock>().ToList());
             }
 
             public Task<bool> AddAsync(IActiveLock activeLock, CancellationToken cancellationToken)
