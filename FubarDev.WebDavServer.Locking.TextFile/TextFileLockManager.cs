@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -63,10 +64,13 @@ namespace FubarDev.WebDavServer.Locking.TextFile
 
             private readonly SemaphoreSlim _semaphore;
 
+            private readonly IDictionary<string, ActiveLock> _locks;
+
             public TextFileTransaction(string lockFileName, SemaphoreSlim semaphore)
             {
                 _lockFileName = lockFileName;
                 _semaphore = semaphore;
+                _locks = Load(lockFileName);
             }
 
             public Task<IReadOnlyCollection<IActiveLock>> GetActiveLocksAsync(CancellationToken cancellationToken)
@@ -96,12 +100,33 @@ namespace FubarDev.WebDavServer.Locking.TextFile
 
             public Task CommitAsync(CancellationToken cancellationToken)
             {
-                throw new NotImplementedException();
+                var json = JsonConvert.SerializeObject(_locks);
+                File.WriteAllText(_lockFileName, json);
+                return Task.FromResult(0);
             }
 
             public void Dispose()
             {
                 _semaphore.Release();
+            }
+
+            private IDictionary<string, ActiveLock> Load(string lockFileName)
+            {
+                try
+                {
+                    if (File.Exists(lockFileName))
+                    {
+                        var text = File.ReadAllText(lockFileName);
+                        var locks = JsonConvert.DeserializeObject<List<ActiveLock>>(text);
+                        return locks.ToDictionary(x => x.StateToken, StringComparer.OrdinalIgnoreCase);
+                    }
+                }
+                catch
+                {
+                    // Ignore errors and just return an empty dictionary
+                }
+
+                return new Dictionary<string, ActiveLock>(StringComparer.OrdinalIgnoreCase);
             }
         }
     }
