@@ -97,6 +97,27 @@ namespace FubarDev.WebDavServer.Locking.TextFile.Tests
             Assert.True(oldExpiration < newExpiration, $"The {newExpiration} must come after the {oldExpiration}");
         }
 
+        [Fact]
+        public async Task TestRemoveLockAsync()
+        {
+            var ct = CancellationToken.None;
+            var lockManager = ServiceProvider.GetRequiredService<ILockManager>();
+
+            var l = new Lock(
+                new Uri(string.Empty, UriKind.Relative),
+                new Uri("http://localhost/"),
+                true,
+                null,
+                LockAccessType.Write,
+                LockShareMode.Exclusive,
+                TimeoutHeader.Infinite);
+            var lr = await lockManager.LockAsync(l, ct).ConfigureAwait(false);
+            Assert.True(lr.ConflictingLocks?.IsEmpty ?? true);
+
+            var lrs = await lockManager.ReleaseAsync(string.Empty, new Uri(lr.Lock.StateToken), ct);
+            Assert.Equal(LockReleaseStatus.Success, lrs);
+        }
+
         public void Dispose()
         {
             _scope.Dispose();

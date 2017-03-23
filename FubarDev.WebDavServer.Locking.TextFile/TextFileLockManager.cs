@@ -98,12 +98,16 @@ namespace FubarDev.WebDavServer.Locking.TextFile
 
             public Task<bool> RemoveAsync(string stateToken, CancellationToken cancellationToken)
             {
-                throw new NotImplementedException();
+                var exists = _locks.Remove(stateToken);
+                return Task.FromResult(exists);
             }
 
             public Task<IActiveLock> GetAsync(string stateToken, CancellationToken cancellationToken)
             {
-                throw new NotImplementedException();
+                ActiveLock activeLock;
+                if (!_locks.TryGetValue(stateToken, out activeLock))
+                    return null;
+                return Task.FromResult<IActiveLock>(activeLock);
             }
 
             public Task CommitAsync(CancellationToken cancellationToken)
