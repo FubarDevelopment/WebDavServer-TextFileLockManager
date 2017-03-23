@@ -84,7 +84,7 @@ namespace FubarDev.WebDavServer.Locking.TextFile
 
             public Task<bool> AddAsync(IActiveLock activeLock, CancellationToken cancellationToken)
             {
-                var isNew = _locks.ContainsKey(activeLock.StateToken);
+                var isNew = !_locks.ContainsKey(activeLock.StateToken);
                 _locks[activeLock.StateToken] = ToActiveLock(activeLock);
                 return Task.FromResult(isNew);
             }
