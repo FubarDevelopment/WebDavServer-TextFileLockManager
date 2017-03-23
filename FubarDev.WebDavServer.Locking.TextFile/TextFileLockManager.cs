@@ -91,7 +91,9 @@ namespace FubarDev.WebDavServer.Locking.TextFile
 
             public Task<bool> UpdateAsync(IActiveLock activeLock, CancellationToken cancellationToken)
             {
-                throw new NotImplementedException();
+                var isUpdating = _locks.ContainsKey(activeLock.StateToken);
+                _locks[activeLock.StateToken] = ToActiveLock(activeLock);
+                return Task.FromResult(isUpdating);
             }
 
             public Task<bool> RemoveAsync(string stateToken, CancellationToken cancellationToken)
