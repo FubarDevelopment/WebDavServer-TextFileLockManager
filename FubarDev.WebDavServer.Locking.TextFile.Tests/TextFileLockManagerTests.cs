@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+using FubarDev.WebDavServer.FileSystem;
 using FubarDev.WebDavServer.Locking.TextFile.Tests.Support.ServiceBuilders;
 using FubarDev.WebDavServer.Model.Headers;
 
@@ -28,7 +29,7 @@ namespace FubarDev.WebDavServer.Locking.TextFile.Tests
         [Fact]
         public async Task TestGetEmptyLocksAsync()
         {
-            var lockManager = ServiceProvider.GetService<ILockManager>();
+            var lockManager = ServiceProvider.GetRequiredService<ILockManager>();
             var locks =
                 (await lockManager
                      .GetLocksAsync(CancellationToken.None)
@@ -41,7 +42,7 @@ namespace FubarDev.WebDavServer.Locking.TextFile.Tests
         public async Task TestAddLockAsync()
         {
             var ct = CancellationToken.None;
-            var lockManager = ServiceProvider.GetService<ILockManager>();
+            var lockManager = ServiceProvider.GetRequiredService<ILockManager>();
 
             var l = new Lock(
                 new Uri(string.Empty, UriKind.Relative),
@@ -51,7 +52,7 @@ namespace FubarDev.WebDavServer.Locking.TextFile.Tests
                 LockAccessType.Write,
                 LockShareMode.Exclusive,
                 TimeoutHeader.Infinite);
-            var lr = await lockManager.LockAsync(l, ct);
+            var lr = await lockManager.LockAsync(l, ct).ConfigureAwait(false);
             Assert.True(lr.ConflictingLocks?.IsEmpty ?? true);
 
             var locks =
@@ -60,6 +61,40 @@ namespace FubarDev.WebDavServer.Locking.TextFile.Tests
                      .ConfigureAwait(false))
                 .ToList();
             Assert.Equal(1, locks.Count);
+        }
+
+        [Fact]
+        public async Task TestLockRefreshAsync()
+        {
+            var ct = CancellationToken.None;
+            var lockManager = ServiceProvider.GetRequiredService<ILockManager>();
+
+            var l = new Lock(
+                new Uri(string.Empty, UriKind.Relative),
+                new Uri("http://localhost/"),
+                true,
+                null,
+                LockAccessType.Write,
+                LockShareMode.Exclusive,
+                TimeSpan.FromMinutes(1));
+            var lr = await lockManager.LockAsync(l, ct).ConfigureAwait(false);
+            Assert.True(lr.ConflictingLocks?.IsEmpty ?? true);
+            Assert.NotNull(lr.Lock);
+
+            var oldExpiration = lr.Lock.Expiration;
+
+            var fs = ServiceProvider.GetRequiredService<IFileSystem>();
+            var ctxt = ServiceProvider.GetRequiredService<IWebDavContext>();
+            //var ifHeader = new IfHeader(new []{ new IfHeaderList()});
+            var ifHeader = IfHeader.Parse($"(<{lr.Lock.StateToken}>)", EntityTagComparer.Strong, ctxt);
+            var lrr = await lockManager.RefreshLockAsync(fs, ifHeader, TimeSpan.FromMinutes(1), ct).ConfigureAwait(false);
+            Assert.Null(lrr.ErrorResponse);
+            Assert.NotNull(lrr.RefreshedLocks);
+            Assert.Equal(1, lrr.RefreshedLocks.Count);
+
+            var refreshedLock = lrr.RefreshedLocks.Single();
+            var newExpiration = refreshedLock.Expiration;
+            Assert.True(oldExpiration < newExpiration, $"The {newExpiration} must come after the {oldExpiration}");
         }
 
         public void Dispose()

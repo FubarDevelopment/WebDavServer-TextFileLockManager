@@ -6,6 +6,8 @@
 
   <ItemGroup>
     <PackageReference Include="FubarDev.WebDavServer" Version="0.1.7" />
+    <PackageReference Include="FubarDev.WebDavServer.FileSystem.InMemory" Version="0.1.7" />
+    <PackageReference Include="FubarDev.WebDavServer.Props.Store.InMemory" Version="0.1.7" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="1.1.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="1.1.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="1.1.1" />
